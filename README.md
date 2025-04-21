@@ -3,6 +3,8 @@
 ## Descripción
 Este proyecto implementa un sistema educativo basado en una arquitectura de microservicios, diseñado para gestionar estudiantes, docentes, asignaturas y matrículas de manera distribuida y escalable. Cada microservicio es independiente y se comunica con los demás a través de APIs REST, utilizando tecnologías modernas como Spring Boot, Spring Cloud y MongoDB.
 
+El sistema sigue un enfoque DevOps completo con pruebas automatizadas, integración continua, despliegue continuo, monitorización y orquestación de contenedores.
+
 ## Arquitectura del Sistema
 ### Componentes Principales
 
@@ -18,6 +20,7 @@ Este proyecto implementa un sistema educativo basado en una arquitectura de micr
 - Gestión de estudiantes y docentes
 - Autenticación y autorización mediante JWT
 - Perfiles de usuario y control de acceso basado en roles
+- Implementa seguridad con generación de tokens JWT
 
 ### 4. Microservicio de Asignaturas
 - CRUD de materias académicas
@@ -32,6 +35,11 @@ Este proyecto implementa un sistema educativo basado en una arquitectura de micr
 - Dashboard de monitorización para supervisar el estado de los microservicios
 - Visualización de métricas y estado de salud
 
+### 7. Sistema de Monitorización
+- Prometheus para la recolección y almacenamiento de métricas
+- Grafana para la visualización y alerting de métricas
+- Integración con Spring Boot Actuator para exponer endpoints de salud y métricas
+
 ## Tecnologías Utilizadas
 - Lenguaje de programación: Java 17
 - Framework: Spring Boot 3.3.10, Spring Cloud 2023.0.5
@@ -43,10 +51,14 @@ Este proyecto implementa un sistema educativo basado en una arquitectura de micr
 - Monitorización: Spring Boot Actuator
 - Descubrimiento de servicios: Eureka Server
 - Configuración centralizada: Config Server
+- CI/CD: GitHub Actions
 
 ## Estructura del Proyecto
 ```
 Microservicios-Sistema-Educativo/
+│
+├── .github/workflows/           # Configuración de GitHub Actions para CI/CD
+│   └── test.yml                 # Pipeline de pruebas automatizadas
 │
 ├── .idea/                     # Configuración del IDE
 │
@@ -66,6 +78,8 @@ Microservicios-Sistema-Educativo/
 │
 ├── docker-compose.yml         # Configuración para orquestación con Docker
 │
+├── prometheus.yml               # Configuración de Prometheus para monitorización
+│
 └── README.md                  # Documentación general del proyecto
 ```
 ## Requisitos Previos
@@ -81,17 +95,17 @@ Microservicios-Sistema-Educativo/
 
 ### Clonar el repositorio
 ```bash
-git clone https://github.com/lezmez/Microservicios-Sistema-Educativo.git
-cd Microservicios-Sistema-Educativo
+git clone https://github.com/lezmez/Sistema-Educativo-Microservicios-DevOps.git
+cd Sistema-Educativo-Microservicios-DevOps
 ```
 ### Iniciar los servicios en orden
 ```bash
-# 1. Config Server
-cd config-server
+# 1. Eureka Server
+cd ../eureka-server
 mvn spring-boot:run
 
-# 2. Eureka Server
-cd ../eureka-server
+# 2. Config Server
+cd config-server
 mvn spring-boot:run
 
 # 3. Microservicios (en ventanas de terminal separadas)
@@ -112,13 +126,24 @@ mvn spring-boot:run
 
 ### Clonar el repositorio
 ```bash
-git clone https://github.com/lezmez/Microservicios-Sistema-Educativo.git
-cd Microservicios-Sistema-Educativo
+git clone https://github.com/lezmez/Sistema-Educativo-Microservicios-DevOps.git
+cd Sistema-Educativo-Microservicios-DevOps
 ```
 ### Construir y ejecutar con Docker Compose
 ```bash
 docker-compose up -d
 ```
+Este comando iniciará todos los servicios definidos en el archivo docker-compose.yml:
+
+- Eureka Server para el registro y descubrimiento de servicios
+- Config Server para la configuración centralizada
+- MongoDB como base de datos
+- Monitor Admin para supervisión
+- Microservicios: Users, Subjects y Registration
+- Prometheus para la recolección de métricas
+- Grafana para la visualización de datos
+
+Los servicios se iniciarán con retrasos programados para asegurar una secuencia de arranque adecuada, garantizando que las dependencias estén disponibles antes de que cada servicio inicie.
 
 ## Flujo de Comunicación
 1. El usuario se autentica a través del microservicio de usuarios y obtiene un token JWT
@@ -147,10 +172,35 @@ docker-compose up -d
 - `GET /api/registrations/student/{userId}`: Lista matrículas por estudiante
 - `GET /api/registrations/subject/{subjectId}`: Lista estudiantes por asignatura
 
-### Monitorización
-Para acceder al panel de monitorización:
-- URL: `http://localhost:8090`
-- Esta interfaz muestra el estado de todos los microservicios registrados, métricas de rendimiento y detalles de salud.
+### Endpoints de Monitorización
+- Spring Boot Actuator: `/actuator/health`, `/actuator/metrics`, `/actuator/info` en cada servicio
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+- Monitor Admin: `http://localhost:8088`
+- Eureka Dashboard: `http://localhost:8761`
+
+## Sistema de Monitorización
+### Prometheus
+
+- Recolecta métricas de todos los servicios a través de los endpoints de Actuator
+- Configurado para escanear los servicios cada 15 segundos
+- Accesible en `http://localhost:9090`
+
+### Grafana
+
+- Proporciona visualizaciones avanzadas de las métricas recolectadas por Prometheus
+- Dashboards configurables para monitorizar el rendimiento del sistema
+- Accesible en `http://localhost:3000`
+- Credenciales por defecto: admin/admin
+
+### Configuración de Prometheus
+El archivo `prometheus.yml` define los trabajos de scraping para recolectar métricas de:
+- Eureka Server
+- Config Server
+- Monitor Admin
+- Servicio de Usuarios
+- Servicio de Asignaturas
+- Servicio de Matrículas
 
 ### Seguridad
 El sistema implementa autenticación y autorización mediante JWT:
@@ -158,15 +208,35 @@ El sistema implementa autenticación y autorización mediante JWT:
 - El token JWT obtenido debe incluirse en las cabeceras de las peticiones a los demás microservicios
 - Los roles de usuario determinan el acceso a diferentes funcionalidades
 
-### Pruebas
+## Pruebas Automatizadas
+### Pruebas Unitarias
+Cada microservicio incluye pruebas unitarias implementadas con JUnit y Mockito:
+
+- Al menos 2 pruebas unitarias por microservicio
+- Verificación de la lógica de negocio aislada
+
+### Pruebas de Integración
+
+- Pruebas con WebTestClient para verificar el comportamiento de los endpoints
+- Al menos 1 prueba de integración por microservicio
+
+### Ejecución de Pruebas
 Para ejecutar las pruebas de cada microservicio:
 ```bash
 cd [nombre-microservicio]
 mvn test
 ```
-La colección de Postman para pruebas de integración está disponible en el directorio `docs/postman`.
-### Despliegue en Producción
+## Pipeline CI/CD
+El repositorio incluye configuración para integración continua mediante GitHub Actions:
+
+- Archivo de configuración: `.github/workflows/test.yml`
+- Ejecuta todas las pruebas automatizadas en cada push al repositorio
+- Verifica la calidad del código antes de su integración
+
+Para ver el estado del pipeline, visita la pestaña "Actions" en el repositorio de GitHub.
+## Despliegue en Producción
 Para un despliegue en producción, se recomienda:
+
 - Configurar HTTPS para todas las comunicaciones
 - Ajustar las configuraciones de cada microservicio para entornos de producción
 - Implementar múltiples instancias de cada microservicio para alta disponibilidad
