@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  eureka-server:
+    build:
+      context: ./eureka-server
+    hostname: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - microservices
+
+  config-server:
+    build:
+      context: ./config-server
+    hostname: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/JefferPinzon/prueba1
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Esperando 20 segundos para que Eureka Server se inicialice...' &&
+        sleep 20 &&
+        echo 'Iniciando Config Server...' &&
+        exec java -jar app.jar
+      "
+    networks:
+      - microservices
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: app
+    networks:
+      - microservices
+
+
+
+  monitor-admin:
+    build:
+      context: ./monitor-admin
+    hostname: monitor-admin
+    ports:
+      - "8088:8088"
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+    depends_on:
+      - eureka-server
+    networks:
+      - microservices
+  users:
+    build:
+      context: ./users
+    hostname: users-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/userdb
+    depends_on:
+      - eureka-server
+      - config-server
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Esperando 30 segundos para iniciar Users Service...' &&
+        sleep 30 &&
+        exec java -jar app.jar
+      "
+    networks:
+      - microservices
+
+  subjects:
+    build:
+      context: ./subjects
+    hostname: subjects-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/subjectdb
+    depends_on:
+      - eureka-server
+      - config-server
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Esperando 35 segundos para iniciar Subjects Service...' &&
+        sleep 35 &&
+        exec java -jar app.jar
+      "
+    networks:
+      - microservices
+
+  registration:
+    build:
+      context: ./registration
+    hostname: registration-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/registrationdb
+    depends_on:
+      - eureka-server
+      - config-server
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Esperando 40 segundos para iniciar Registration Service...' &&
+        sleep 40 &&
+        exec java -jar app.jar
+      "
+    networks:
+      - microservices
+
+
+  prometheus:
+    image: prom/prometheus
+    hostname: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - microservices
+
+  grafana:
+    image: grafana/grafana
+    hostname: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - microservices
+
+networks:
+  microservices:
+    driver: bridge
+
+volumes:
+  mongo-data:
+    driver: local
+  grafana-data:
+    driver: local
